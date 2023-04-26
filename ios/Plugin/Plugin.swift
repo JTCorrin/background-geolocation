@@ -2,6 +2,12 @@ import Capacitor
 import Foundation
 import UIKit
 import CoreLocation
+import FirebaseCore
+import FirebaseFirestore
+
+FirebaseApp.configure()
+
+let db = Firestore.firestore()
 
 // Avoids a bewildering type warning.
 let null = Optional<Double>.none as Any
@@ -68,6 +74,7 @@ class Watcher {
 @objc(BackgroundGeolocation)
 public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
     private var watchers = [Watcher]()
+    private var sessionId = nil
 
     @objc public override func load() {
         UIDevice.current.isBatteryMonitoringEnabled = true
@@ -75,7 +82,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
 
     @objc func addWatcher(_ call: CAPPluginCall) {
         call.keepAlive = true
-
+        sessionId = call.getString("sessionId")
         // CLLocationManager requires main thread
         DispatchQueue.main.async {
             let background = call.getString("backgroundMessage") != nil
@@ -206,6 +213,8 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
                 where: { $0.locationManager == manager }
             ) {
                 if watcher.isLocationValid(location) {
+                    // TODO Update firestore directly
+                    db.collection("sessions").doc(sessionId).update()
                     if let call = self.bridge?.savedCall(withID: watcher.callbackId) {
                         return call.resolve(formatLocation(location))
                     }

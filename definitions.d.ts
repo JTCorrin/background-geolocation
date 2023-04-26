@@ -1,4 +1,5 @@
 export interface WatcherOptions {
+    sessionId: string,
     backgroundMessage?: string;
     backgroundTitle?: string;
     requestPermissions?: boolean;

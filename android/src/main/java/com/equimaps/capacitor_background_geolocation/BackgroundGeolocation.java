@@ -33,6 +33,8 @@ import org.json.JSONObject;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.google.firebase.firestore.FirebaseFirestore;
+
 
 
 @NativePlugin(
@@ -76,7 +78,7 @@ public class BackgroundGeolocation extends Plugin {
             return;
         }
         call.setKeepAlive(true);
-        sessionId = call.getString("sessionId")
+        sessionId = call.getString("sessionId");
         if (!hasRequiredPermissions()) {
             if (call.getBoolean("requestPermissions", true)) {
                 callPendingPermissions = call;
@@ -265,8 +267,8 @@ public class BackgroundGeolocation extends Plugin {
             newLocation.put("timestamp", FieldValue.serverTimestamp());
             Geopoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
             newLocation.put("geopoint", geopoint);
-            newLocation.put("address", "Not available when tracking")
-            newLocation.put("w3w", "Not available when tracking")
+            newLocation.put("address", "Not available when tracking");
+            newLocation.put("w3w", "Not available when tracking");
             db.collection("sessions").doc(sessionId).update("locations", FieldValue.arrayUnion(newLocation));
             call.success(formatLocation(location));
         }
