@@ -33,6 +33,8 @@ import org.json.JSONObject;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+
+
 @NativePlugin(
         permissions={
                 // As of API level 31, the coarse permission MUST accompany
@@ -44,8 +46,10 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
         permissionRequestCode = 28351
 )
 public class BackgroundGeolocation extends Plugin {
+    private FirebaseFirestore db = FirebaseFirestore.getInstance();
     private PluginCall callPendingPermissions = null;
     private Boolean stoppedWithoutPermissions = false;
+    private String sessionId = null; 
 
     private void fetchLastLocation(PluginCall call) {
         try {
@@ -72,6 +76,7 @@ public class BackgroundGeolocation extends Plugin {
             return;
         }
         call.setKeepAlive(true);
+        sessionId = call.getString("sessionId")
         if (!hasRequiredPermissions()) {
             if (call.getBoolean("requestPermissions", true)) {
                 callPendingPermissions = call;
@@ -254,6 +259,15 @@ public class BackgroundGeolocation extends Plugin {
                 }
                 return;
             }
+
+            Map<String, Object> newLocation = new HashMap<>();
+            newLocation.put("type", "tracked");
+            newLocation.put("timestamp", FieldValue.serverTimestamp());
+            Geopoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+            newLocation.put("geopoint", geopoint);
+            newLocation.put("address", "Not available when tracking")
+            newLocation.put("w3w", "Not available when tracking")
+            db.collection("sessions").doc(sessionId).update("locations", FieldValue.arrayUnion(newLocation));
             call.success(formatLocation(location));
         }
     }
