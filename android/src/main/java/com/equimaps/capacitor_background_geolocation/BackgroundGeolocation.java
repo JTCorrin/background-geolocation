@@ -1,4 +1,8 @@
 package com.equimaps.capacitor_background_geolocation;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import android.Manifest;
 import android.app.Notification;
@@ -18,6 +22,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.util.Log;
+import androidx.annotation.NonNull;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
@@ -28,12 +34,20 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.android.BuildConfig;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 
 import org.json.JSONObject;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.GeoPoint;
+
 
 
 
@@ -261,15 +275,7 @@ public class BackgroundGeolocation extends Plugin {
                 }
                 return;
             }
-
-            Map<String, Object> newLocation = new HashMap<>();
-            newLocation.put("type", "tracked");
-            newLocation.put("timestamp", FieldValue.serverTimestamp());
-            Geopoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
-            newLocation.put("geopoint", geopoint);
-            newLocation.put("address", "Not available when tracking");
-            newLocation.put("w3w", "Not available when tracking");
-            db.collection("sessions").doc(sessionId).update("locations", FieldValue.arrayUnion(newLocation));
+            updateLocationsArray(sessionId, location);
             call.success(formatLocation(location));
         }
     }
@@ -288,6 +294,59 @@ public class BackgroundGeolocation extends Plugin {
         int id = getAppResourceIdentifier(name, "string");
         return id == 0 ? fallback : getContext().getString(id);
     }
+
+    private void updateLocationsArray(String sessionId, Location location) {
+        // Get the reference to the document you want to update
+        DocumentReference docRef = db.collection("sessions").document(sessionId);
+    
+        docRef.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                if (task.isSuccessful()) {
+                    DocumentSnapshot document = task.getResult();
+                    if (document.exists()) {
+                        // Get the current locations array
+                        List<Map<String, Object>> locations = (List<Map<String, Object>>) document.get("locations");
+                        if (locations == null) {
+                            locations = new ArrayList<>();
+                        }
+    
+                        // Create a new location map
+                        Map<String, Object> newLocation = new HashMap<>();
+                        newLocation.put("type", "tracked");
+                        newLocation.put("timestamp", FieldValue.serverTimestamp());
+                        GeoPoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+                        newLocation.put("geopoint", geopoint);
+                        newLocation.put("address", "Not available when tracking");
+                        newLocation.put("w3w", "Not available when tracking");
+    
+                        // Add the new location to the locations array
+                        locations.add(newLocation);
+    
+                        // Update the document with the modified locations array
+                        docRef.update("locations", locations)
+                                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                    @Override
+                                    public void onSuccess(Void aVoid) {
+                                        Log.d("Firestore", "DocumentSnapshot successfully updated!");
+                                    }
+                                })
+                                .addOnFailureListener(new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+                                        Log.w("Firestore", "Error updating document", e);
+                                    }
+                                });
+                    } else {
+                        Log.d("Firestore", "No such document");
+                    }
+                } else {
+                    Log.d("Firestore", "get failed with ", task.getException());
+                }
+            }
+        });
+    }
+    
 
     @Override
     public void load() {
