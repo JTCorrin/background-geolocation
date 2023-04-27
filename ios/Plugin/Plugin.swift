@@ -214,7 +214,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
             ) {
                 if watcher.isLocationValid(location) {
                     // TODO Update firestore directly
-                    db.collection("sessions").doc(sessionId).update()
+                    updateLocationsArray(call.getString("sessionId"), location)
                     if let call = self.bridge?.savedCall(withID: watcher.callbackId) {
                         return call.resolve(formatLocation(location))
                     }
@@ -235,6 +235,29 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
                 where: { $0.locationManager == manager }
             ) {
                 return watcher.start()
+            }
+        }
+    }
+
+    private func updateLocationsArray(sessionId: String, location: CLLocation) {
+        // Get a reference to the document you want to update
+        let docRef = db.collection("sessions").document(sessionId)
+        
+        // Create a new location dictionary with the current timestamp
+        let newLocation: [String: Any] = [
+            "type": "tracked",
+            "timestamp": FieldValue.serverTimestamp(),
+            "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude),
+            "address": "Not available when tracking",
+            "w3w": "Not available when tracking"
+        ]
+        
+        // Add the new location to the "locations" array
+        docRef.updateData(["locations": FieldValue.arrayUnion([newLocation])]) { error in
+            if let error = error {
+                print("Error updating document: \(error)")
+            } else {
+                print("Document successfully updated!")
             }
         }
     }

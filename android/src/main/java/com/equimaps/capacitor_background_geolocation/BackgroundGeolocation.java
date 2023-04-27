@@ -298,53 +298,30 @@ public class BackgroundGeolocation extends Plugin {
     private void updateLocationsArray(String sessionId, Location location) {
         // Get the reference to the document you want to update
         DocumentReference docRef = db.collection("sessions").document(sessionId);
-    
-        docRef.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-            @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if (task.isSuccessful()) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document.exists()) {
-                        // Get the current locations array
-                        List<Map<String, Object>> locations = (List<Map<String, Object>>) document.get("locations");
-                        if (locations == null) {
-                            locations = new ArrayList<>();
-                        }
-    
-                        // Create a new location map
-                        Map<String, Object> newLocation = new HashMap<>();
-                        newLocation.put("type", "tracked");
-                        newLocation.put("timestamp", FieldValue.serverTimestamp());
-                        GeoPoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
-                        newLocation.put("geopoint", geopoint);
-                        newLocation.put("address", "Not available when tracking");
-                        newLocation.put("w3w", "Not available when tracking");
-    
-                        // Add the new location to the locations array
-                        locations.add(newLocation);
-    
-                        // Update the document with the modified locations array
-                        docRef.update("locations", locations)
-                                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                    @Override
-                                    public void onSuccess(Void aVoid) {
-                                        Log.d("Firestore", "DocumentSnapshot successfully updated!");
-                                    }
-                                })
-                                .addOnFailureListener(new OnFailureListener() {
-                                    @Override
-                                    public void onFailure(@NonNull Exception e) {
-                                        Log.w("Firestore", "Error updating document", e);
-                                    }
-                                });
-                    } else {
-                        Log.d("Firestore", "No such document");
-                    }
-                } else {
-                    Log.d("Firestore", "get failed with ", task.getException());
+
+        // Create a new location map
+        Map<String, Object> newLocation = new HashMap<>();
+        newLocation.put("type", "tracked");
+        newLocation.put("timestamp", System.currentTimeMillis());
+        GeoPoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+        newLocation.put("geopoint", geopoint);
+        newLocation.put("address", "Not available when tracking");
+        newLocation.put("w3w", "Not available when tracking");
+
+        // Update the document with the new location
+        docRef.update("locations", FieldValue.arrayUnion(newLocation))
+            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                @Override
+                public void onSuccess(Void aVoid) {
+                    Log.d("Firestore", "DocumentSnapshot successfully updated!");
                 }
-            }
-        });
+            })
+            .addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Log.w("Firestore", "Error updating document", e);
+                }
+            });
     }
     
 
