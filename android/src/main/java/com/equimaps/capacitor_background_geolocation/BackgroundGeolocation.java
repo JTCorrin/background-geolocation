@@ -308,8 +308,19 @@ public class BackgroundGeolocation extends Plugin {
         newLocation.put("address", "Not available when tracking");
         newLocation.put("w3w", "Not available when tracking");
 
+        // Add location to logs
+        Map<String, Object> newLog = new HashMap<>();
+        newLog.put("createdBy", "Guardian")
+        newLog.put("timestamp", System.currentTimeMillis())
+        newLog.put("text", "Latest location received: " + location.getLatitude() + ":" + location.getLongitude())
+
+        // Create an updates hashmap
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("locations", FieldValue.arrayUnion(newLocation))
+        updates.put("logs", FieldValue.arrayUnion(newLog))
+
         // Update the document with the new location
-        docRef.update("locations", FieldValue.arrayUnion(newLocation))
+        docRef.update(updates)
             .addOnSuccessListener(new OnSuccessListener<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {

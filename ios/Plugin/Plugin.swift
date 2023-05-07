@@ -247,13 +247,22 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
         let newLocation: [String: Any] = [
             "type": "tracked",
             "timestamp": FieldValue.serverTimestamp(),
-            "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude),
+            "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.latitude),
             "address": "Not available when tracking",
             "w3w": "Not available when tracking"
         ]
+
+        let newLog: [String: Any] = [
+            "timestamp": FieldValue.serverTimestamp(),
+            "createdBy": "Guardian",
+            "text": "Latest location received: " + location.coordinate.latitude + ":" + location.coordinate.latitude
+        ]
         
         // Add the new location to the "locations" array
-        docRef.updateData(["locations": FieldValue.arrayUnion([newLocation])]) { error in
+        docRef.updateData([
+                "locations": FieldValue.arrayUnion([newLocation]),
+                "logs": FieldValue.arrayUnion([newLog])
+            ]) { error in
             if let error = error {
                 print("Error updating document: \(error)")
             } else {
