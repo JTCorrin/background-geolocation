@@ -5,7 +5,6 @@ import CoreLocation
 import FirebaseCore
 import FirebaseFirestore
 
-FirebaseApp.configure()
 
 let db = Firestore.firestore()
 
@@ -77,6 +76,9 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
     private var sessionId = nil
 
     @objc public override func load() {
+        if (FirebaseApp.app() == nil) {
+            FirebaseApp.configure();
+        }
         UIDevice.current.isBatteryMonitoringEnabled = true
     }
 
