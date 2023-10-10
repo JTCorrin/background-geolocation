@@ -6,7 +6,7 @@ import FirebaseCore
 import FirebaseFirestore
 
 
-let db = Firestore.firestore()
+
 
 // Avoids a bewildering type warning.
 let null = Optional<Double>.none as Any
@@ -72,8 +72,10 @@ class Watcher {
 
 @objc(BackgroundGeolocation)
 public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
+
+    private var db = Firestore.firestore()
     private var watchers = [Watcher]()
-    private var sessionId = nil
+    private var sessionId = ""
 
     @objc public override func load() {
         if (FirebaseApp.app() == nil) {
@@ -84,7 +86,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
 
     @objc func addWatcher(_ call: CAPPluginCall) {
         call.keepAlive = true
-        sessionId = call.getString("sessionId")
+        sessionId = call.getString("sessionId", "")
         // CLLocationManager requires main thread
         DispatchQueue.main.async {
             let background = call.getString("backgroundMessage") != nil
@@ -216,8 +218,8 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
             ) {
                 if watcher.isLocationValid(location) {
                     // TODO Update firestore directly
-                    updateLocationsArray(call.getString("sessionId"), location)
                     if let call = self.bridge?.savedCall(withID: watcher.callbackId) {
+                        updateLocationsArray(sessionId: call.getString("sessionId", ""), location: location)
                         return call.resolve(formatLocation(location))
                     }
                 }
@@ -248,8 +250,8 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
         // Create a new location dictionary with the current timestamp
         let newLocation: [String: Any] = [
             "type": "tracked",
-            "timestamp": FieldValue.serverTimestamp(),
-            "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.latitude),
+            "timestamp": NSDate().timeIntervalSince1970 * 1000,
+            "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude),
             "address": "Not available when tracking",
             "w3w": "Not available when tracking"
         ]
