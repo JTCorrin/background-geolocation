@@ -257,9 +257,9 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
         ]
 
         let newLog: [String: Any] = [
-            "timestamp": FieldValue.serverTimestamp(),
+            "timestamp": NSDate().timeIntervalSince1970 * 1000,
             "createdBy": "Guardian",
-            "text": "Latest location received: " + location.coordinate.latitude + ":" + location.coordinate.latitude
+            "text": "Latest location received: " + "\(location.coordinate.latitude)" + ":" + "\(location.coordinate.latitude)"
         ]
         
         // Add the new location to the "locations" array
