@@ -31,6 +31,9 @@ import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 import androidx.annotation.NonNull;
+import android.os.Handler;
+import android.os.Looper;
+
 
 
 import com.getcapacitor.JSObject;
@@ -46,6 +49,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -73,7 +77,7 @@ public class BackgroundGeolocation extends Plugin {
     private FirebaseFirestore db = FirebaseFirestore.getInstance();
     private PluginCall callPendingPermissions = null;
     private Boolean stoppedWithoutPermissions = false;
-    private String sessionId = null; 
+    private String sessionId = null;
     private String w3wAPIKey = null;
 
     private void fetchLastLocation(PluginCall call) {
@@ -316,7 +320,7 @@ public class BackgroundGeolocation extends Plugin {
             e.printStackTrace();
             return;
         }
-    
+
         // Make the request in a new thread
         new Thread(new Runnable() {
             @Override
@@ -325,26 +329,31 @@ public class BackgroundGeolocation extends Plugin {
                 try {
                     urlConnection = (HttpURLConnection) url.openConnection();
                     urlConnection.setRequestMethod("GET");
-    
+
                     // Get the InputStream
                     InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-    
+
                     // Convert InputStream to String
                     String response = convertStreamToString(in);
-    
+
                     // Parse the JSON response
-                    JSONObject jsonResponse = new JSONObject(response);
-                    String words = jsonResponse.optString("words", null);
-    
-                    // Call updateLocationsArray on the main thread
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateLocationsArray(sessionId, location, words);
-                        }
-                    });
-    
-                } catch (IOException | JSONException e) {
+					try {
+						JSONObject jsonResponse = new JSONObject(response);
+						String words = jsonResponse.optString("words", null);
+
+						// Call updateLocationsArray on the main thread
+						new Handler(Looper.getMainLooper()).post(new Runnable() {
+							@Override
+							public void run() {
+								updateLocationsArray(sessionId, location, words);
+							}
+						});
+					} catch (JSONException e) {
+						e.printStackTrace();
+						// Handle JSON parsing error
+					}
+
+                } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
                     if (urlConnection != null) {
@@ -354,7 +363,7 @@ public class BackgroundGeolocation extends Plugin {
             }
         }).start();
     }
-    
+
     private String convertStreamToString(InputStream is) {
         Scanner s = new Scanner(is).useDelimiter("\\A");
         return s.hasNext() ? s.next() : "";
@@ -399,7 +408,7 @@ public class BackgroundGeolocation extends Plugin {
                 }
             });
     }
-    
+
 
     @Override
     public void load() {
