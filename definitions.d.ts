@@ -1,4 +1,5 @@
 export interface WatcherOptions {
+    w3wAPIKey: string,
     sessionId: string,
     backgroundMessage?: string;
     backgroundTitle?: string;
