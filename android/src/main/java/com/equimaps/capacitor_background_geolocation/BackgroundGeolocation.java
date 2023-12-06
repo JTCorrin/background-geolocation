@@ -66,6 +66,7 @@ public class BackgroundGeolocation extends Plugin {
     private PluginCall callPendingPermissions = null;
     private Boolean stoppedWithoutPermissions = false;
     private String sessionId = null; 
+    private String w3wAPIKey = null;
 
     private void fetchLastLocation(PluginCall call) {
         try {
@@ -93,6 +94,7 @@ public class BackgroundGeolocation extends Plugin {
         }
         call.setKeepAlive(true);
         sessionId = call.getString("sessionId");
+        w3wAPIKey = call.getString("w3wAPIKey");
         if (!hasRequiredPermissions()) {
             if (call.getBoolean("requestPermissions", true)) {
                 callPendingPermissions = call;
@@ -295,7 +297,63 @@ public class BackgroundGeolocation extends Plugin {
         return id == 0 ? fallback : getContext().getString(id);
     }
 
-    private void updateLocationsArray(String sessionId, Location location) {
+    private void getW3Words(Location location, final String sessionId) {
+        // Build the URL
+        String w3wAPIKey = "your_api_key_here";
+        String urlString = "https://api.what3words.com/v3/convert-to-3wa?coordinates=" +
+                           location.getLatitude() + "," + location.getLongitude() + "&key=" + w3wAPIKey;
+        URL url;
+        try {
+            url = new URL(urlString);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return;
+        }
+    
+        // Make the request in a new thread
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection urlConnection = null;
+                try {
+                    urlConnection = (HttpURLConnection) url.openConnection();
+                    urlConnection.setRequestMethod("GET");
+    
+                    // Get the InputStream
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+    
+                    // Convert InputStream to String
+                    String response = convertStreamToString(in);
+    
+                    // Parse the JSON response
+                    JSONObject jsonResponse = new JSONObject(response);
+                    String words = jsonResponse.optString("words", null);
+    
+                    // Call updateLocationsArray on the main thread
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateLocationsArray(sessionId, location, words);
+                        }
+                    });
+    
+                } catch (IOException | JSONException e) {
+                    e.printStackTrace();
+                } finally {
+                    if (urlConnection != null) {
+                        urlConnection.disconnect();
+                    }
+                }
+            }
+        }).start();
+    }
+    
+    private String convertStreamToString(InputStream is) {
+        Scanner s = new Scanner(is).useDelimiter("\\A");
+        return s.hasNext() ? s.next() : "";
+    }
+
+    private void updateLocationsArray(String sessionId, Location location, String w3w) {
         // Get the reference to the document you want to update
         DocumentReference docRef = db.collection("sessions").document(sessionId);
 
@@ -306,13 +364,13 @@ public class BackgroundGeolocation extends Plugin {
         GeoPoint geopoint = new GeoPoint(location.getLatitude(), location.getLongitude());
         newLocation.put("geopoint", geopoint);
         newLocation.put("address", "Not available when tracking");
-        newLocation.put("w3w", "Not available when tracking");
+        newLocation.put("w3w", w3w != null ? w3w : "Unable to ascertain");
 
         // Add location to logs
         Map<String, Object> newLog = new HashMap<>();
         newLog.put("createdBy", "Guardian");
         newLog.put("timestamp", System.currentTimeMillis());
-        newLog.put("text", "Latest location received: " + location.getLatitude() + ":" + location.getLongitude());
+        newLog.put("text", "Latest location received: " + location.getLatitude() + ":" + location.getLongitude() + ". ///what3words: " + w3w);
 
         // Create an updates hashmap
         Map<String, Object> updates = new HashMap<>();
