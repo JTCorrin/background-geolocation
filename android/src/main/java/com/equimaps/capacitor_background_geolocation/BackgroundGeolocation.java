@@ -285,7 +285,7 @@ public class BackgroundGeolocation extends Plugin {
                 }
                 return;
             }
-            updateLocationsArray(sessionId, location);
+            getW3Words(location, sessionId);
             call.success(formatLocation(location));
         }
     }
@@ -307,7 +307,6 @@ public class BackgroundGeolocation extends Plugin {
 
     private void getW3Words(Location location, final String sessionId) {
         // Build the URL
-        String w3wAPIKey = "your_api_key_here";
         String urlString = "https://api.what3words.com/v3/convert-to-3wa?coordinates=" +
                            location.getLatitude() + "," + location.getLongitude() + "&key=" + w3wAPIKey;
         URL url;
