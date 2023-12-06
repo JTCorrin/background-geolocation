@@ -3,6 +3,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.BufferedInputStream;
+import java.io.InputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Scanner;
 
 import android.Manifest;
 import android.app.Notification;
@@ -24,6 +31,7 @@ import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 import androidx.annotation.NonNull;
+
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
