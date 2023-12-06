@@ -10,6 +10,26 @@ import FirebaseFirestore
 
 // Avoids a bewildering type warning.
 let null = Optional<Double>.none as Any
+struct w3wApiResponse: Codable {
+    let country: String?
+    let square: Square?
+    let nearestPlace: String?
+    let coordinates: Coordinates?
+    let words: String?
+    let language: String?
+    let locale: String?
+    let map: String?
+
+    struct Square: Codable {
+        let southwest: Coordinates?
+        let northeast: Coordinates?
+    }
+
+    struct Coordinates: Codable {
+        let lng: Double?
+        let lat: Double?
+    }
+}
 
 func formatLocation(_ location: CLLocation) -> PluginCallResultData {
     var simulated = false;
@@ -76,6 +96,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
     private var db = Firestore.firestore()
     private var watchers = [Watcher]()
     private var sessionId = ""
+    private var w3wAPIKey = ""
 
     @objc public override func load() {
         if (FirebaseApp.app() == nil) {
@@ -87,6 +108,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
     @objc func addWatcher(_ call: CAPPluginCall) {
         call.keepAlive = true
         sessionId = call.getString("sessionId", "")
+        w3wAPIKey = call.getString("w3wAPIKey", "")
         // CLLocationManager requires main thread
         DispatchQueue.main.async {
             let background = call.getString("backgroundMessage") != nil
@@ -219,7 +241,9 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
                 if watcher.isLocationValid(location) {
                     // TODO Update firestore directly
                     if let call = self.bridge?.savedCall(withID: watcher.callbackId) {
-                        updateLocationsArray(sessionId: call.getString("sessionId", ""), location: location)
+                        getW3Words { words in
+                            self.updateLocationsArray(sessionId: sessionId, location: location, w3w: words)
+                        }
                         return call.resolve(formatLocation(location))
                     }
                 }
@@ -243,9 +267,44 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
         }
     }
 
-    private func updateLocationsArray(sessionId: String, location: CLLocation) {
+    private func getW3Words(completion: @escaping (String?) -> Void) {
+        let url = URL(string: "https://api.what3words.com/v3/convert-to-3wa?coordinates=" + "\(location.coordinate.latitude)" + "%2C" + "\(location.coordinate.latitude)" + "&key=[" + "\(w3wAPIKey)" + "]")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data, error == nil else {
+                print("Error during HTTP request: \(error?.localizedDescription ?? "Unknown error")")
+                completion(nil)
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                do {
+                    let response = try JSONDecoder().decode(ApiResponse.self, from: data)
+                    if let words = response.words {
+                        completion(words) // Call the completion handler with the words
+                    } else {
+                        print("Words not found in the response")
+                        completion(nil)
+                    }
+                } catch {
+                    print("Error parsing JSON: \(error)")
+                    completion(nil)
+                }
+            } else {
+                print("Error: HTTP status code not 200")
+                completion(nil)
+            }
+        }
+        task.resume()
+    }
+
+    private func updateLocationsArray(sessionId: String, location: CLLocation, w3w: String?) {
         // Get a reference to the document you want to update
         let docRef = db.collection("sessions").document(sessionId)
+        let w3wValue = w3w ?? "Unable to ascertain"
         
         // Create a new location dictionary with the current timestamp
         let newLocation: [String: Any] = [
@@ -253,13 +312,13 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
             "timestamp": NSDate().timeIntervalSince1970 * 1000,
             "geopoint": GeoPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude),
             "address": "Not available when tracking",
-            "w3w": "Not available when tracking"
+            "w3w": w3wValue
         ]
 
         let newLog: [String: Any] = [
             "timestamp": NSDate().timeIntervalSince1970 * 1000,
             "createdBy": "Guardian",
-            "text": "Latest location received: " + "\(location.coordinate.latitude)" + ":" + "\(location.coordinate.latitude)"
+            "text": "Latest location received: " + "\(location.coordinate.latitude)" + ":" + "\(location.coordinate.latitude). ///what3words: " + "\(w3wValue)"
         ]
         
         // Add the new location to the "locations" array
