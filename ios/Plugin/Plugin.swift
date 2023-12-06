@@ -241,8 +241,8 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
                 if watcher.isLocationValid(location) {
                     // TODO Update firestore directly
                     if let call = self.bridge?.savedCall(withID: watcher.callbackId) {
-                        getW3Words { words in
-                            self.updateLocationsArray(sessionId: sessionId, location: location, w3w: words)
+                        getW3Words(location: location) { words in
+                            self.updateLocationsArray(sessionId: self.sessionId, location: location, w3w: words)
                         }
                         return call.resolve(formatLocation(location))
                     }
@@ -267,8 +267,8 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
         }
     }
 
-    private func getW3Words(completion: @escaping (String?) -> Void) {
-        let url = URL(string: "https://api.what3words.com/v3/convert-to-3wa?coordinates=" + "\(location.coordinate.latitude)" + "%2C" + "\(location.coordinate.latitude)" + "&key=[" + "\(w3wAPIKey)" + "]")!
+    private func getW3Words(location: CLLocation, completion: @escaping (String?) -> Void) {
+        let url = URL(string: "https://api.what3words.com/v3/convert-to-3wa?coordinates=\(location.coordinate.latitude)%2C\(location.coordinate.latitude)&key=\(w3wAPIKey)")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -282,7 +282,7 @@ public class BackgroundGeolocation : CAPPlugin, CLLocationManagerDelegate {
 
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 do {
-                    let response = try JSONDecoder().decode(ApiResponse.self, from: data)
+                    let response = try JSONDecoder().decode(w3wApiResponse.self, from: data)
                     if let words = response.words {
                         completion(words) // Call the completion handler with the words
                     } else {
