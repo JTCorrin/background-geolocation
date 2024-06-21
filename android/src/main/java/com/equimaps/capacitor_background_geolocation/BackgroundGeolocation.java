@@ -229,9 +229,7 @@ public class BackgroundGeolocation extends Plugin {
         call.resolve();
     }
 
-    // Checks if device-wide location services are disabled
-    private static Boolean isLocationEnabled(Context context)
-    {
+    private static Boolean isLocationEnabled(Context context){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
             return lm != null && lm.isLocationEnabled();
