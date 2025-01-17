@@ -3,12 +3,13 @@ package com.equimaps.capacitor_background_geolocation;
 import android.app.Notification;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 
 import com.getcapacitor.Logger;
-import com.getcapacitor.android.BuildConfig;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationAvailability;
 import com.google.android.gms.location.LocationCallback;
@@ -20,14 +21,9 @@ import java.util.HashSet;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-// A bound and started service that is promoted to a foreground service when
-// location updates have been requested and the main activity is stopped.
-//
-// When an activity is bound to this service, frequent location updates are
-// permitted. When the activity is removed from the foreground, the service
-// promotes itself to a foreground service, and location updates continue. When
-// the activity comes back to the foreground, the foreground service stops, and
-// the notification associated with that service is removed.
+// A bound and started service that is promoted to a foreground service
+// (showing a persistent notification) when the first background watcher is
+// added, and demoted when the last background watcher is removed.
 public class BackgroundGeolocationService extends Service {
     static final String ACTION_BROADCAST = (
             BackgroundGeolocationService.class.getPackage().getName() + ".broadcast"
@@ -103,7 +99,7 @@ public class BackgroundGeolocationService extends Service {
                 }
                 @Override
                 public void onLocationAvailability(LocationAvailability availability) {
-                    if (!availability.isLocationAvailable() && BuildConfig.DEBUG) {
+                    if (!availability.isLocationAvailable()) {
                         Logger.debug("Location not available");
                     }
                 }
@@ -127,6 +123,23 @@ public class BackgroundGeolocationService extends Service {
                         null
                 );
             } catch (SecurityException ignore) {}
+
+            // Promote the service to the foreground if necessary.
+            // Ideally we would only call 'startForeground' if the service is not already
+            // foregrounded. Unfortunately, 'getForegroundServiceType' was only introduced
+            // in API level 29 and seems to behave weirdly, as reported in #120. However,
+            // it appears that 'startForeground' is idempotent, so we just call it repeatedly
+            // each time a background watcher is added.
+            if (backgroundNotification != null) {
+                try {
+                    // This method has been known to fail due to weird
+                    // permission bugs, so we prevent any exceptions from
+                    // crashing the app. See issue #86.
+                    startForeground(NOTIFICATION_ID, backgroundNotification);
+                } catch (Exception exception) {
+                    Logger.error("Failed to foreground service", exception);
+                }
+            }
         }
 
         void removeWatcher(String id) {
@@ -152,28 +165,6 @@ public class BackgroundGeolocationService extends Service {
                         watcher.locationCallback,
                         null
                 );
-            }
-        }
-
-        void onActivityStarted() {
-            stopForeground(true);
-        }
-
-        void onActivityStopped() {
-            Notification notification = getNotification();
-            if (notification != null) {
-                try {
-                    // Android 12 has a bug
-                    // (https://issuetracker.google.com/issues/229000935)
-                    // whereby it mistakenly thinks the app is in the
-                    // foreground at this point, even though it is not. This
-                    // causes a ForegroundServiceStartNotAllowedException to be
-                    // raised, crashing the app unless we suppress it here.
-                    // See issue #86.
-                    startForeground(NOTIFICATION_ID, notification);
-                } catch (Exception exception) {
-                    Logger.error("Failed to start service", exception);
-                }
             }
         }
 

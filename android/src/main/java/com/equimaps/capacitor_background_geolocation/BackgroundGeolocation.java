@@ -42,7 +42,6 @@ import com.getcapacitor.NativePlugin;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.android.BuildConfig;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -76,6 +75,7 @@ import com.google.firebase.firestore.GeoPoint;
 public class BackgroundGeolocation extends Plugin {
     private FirebaseFirestore db = FirebaseFirestore.getInstance();
     private PluginCall callPendingPermissions = null;
+    private BackgroundGeolocationService.LocalBinder service = null;
     private Boolean stoppedWithoutPermissions = false;
     private String sessionId = null;
     private String w3wAPIKey = null;
@@ -268,9 +268,6 @@ public class BackgroundGeolocation extends Plugin {
         return obj;
     }
 
-    // Sends messages to the service.
-    private BackgroundGeolocationService.LocalBinder service = null;
-
     // Receives messages from the service.
     private class ServiceReceiver extends BroadcastReceiver {
         @Override
@@ -281,11 +278,10 @@ public class BackgroundGeolocation extends Plugin {
                 return;
             }
             Location location = intent.getParcelableExtra("location");
-            if (location == null) {
-                if (BuildConfig.DEBUG) {
-                    call.error("No locations received");
-                }
-                return;
+            if (location != null) {
+                call.success(formatLocation(location));
+            } else {
+                Logger.debug("No locations received");
             }
             getW3Words(location, sessionId);
             call.success(formatLocation(location));
@@ -455,7 +451,6 @@ public class BackgroundGeolocation extends Plugin {
     @Override
     protected void handleOnResume() {
         if (service != null) {
-            service.onActivityStarted();
             if (stoppedWithoutPermissions && hasRequiredPermissions()) {
                 service.onPermissionsGranted();
             }
@@ -465,9 +460,6 @@ public class BackgroundGeolocation extends Plugin {
 
     @Override
     protected void handleOnPause() {
-        if (service != null) {
-            service.onActivityStopped();
-        }
         stoppedWithoutPermissions = !hasRequiredPermissions();
         super.handleOnPause();
     }
